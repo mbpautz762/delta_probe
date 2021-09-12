@@ -109,12 +109,7 @@ int main(void) {
     readInput();
 
     Node **table = new Node *[M] {nullptr};
-    Node *bestNode = new Node(0, 0, 0, nullptr);
-    Node *tmpBest1 = new Node(0, 0, 0, nullptr);
-    Node *tmpBest2 = new Node(0, 0, 0, nullptr);
-    tmpBest1->errorRate = 1000;
-    tmpBest2->errorRate = 1000;
-    
+    Node *bestNode = new Node(0, 0, 0, nullptr);   
 
     int i = 0, j = 0, h = 0;
 
@@ -140,22 +135,6 @@ int main(void) {
                 table[h]->falseNeg--;
                 updateProbeInfo(table[h]);
                 if (table[h]->errorRate < bestNode->errorRate) bestNode = table[h];
-
-                //now, update error statistics
-                // table[h]->FPR = (double)(table[h]->falsePos / (N - N_delta));
-                // table[h]->FNR = (double)(table[h]->falseNeg / (N_delta));
-                // table[h]->errorRate = 2.0 * table[h]->FPR + 1.0 * table[h]->FNR;
-
-                // if (table[h]->errorRate < tmpBest1->errorRate) {
-                //     // debug
-                //     tmpBest1 = table[h];
-                //     cout << "new tmpBest1:  " << endl;
-                //     cout << "   key:        " << tmpBest1->key << endl;
-                //     cout << "   probe:      " << sequence[tmpBest1->locations->sequence].substr(tmpBest1->locations->position, K) << endl;
-                //     cout << "   false pos:  " << tmpBest1->falsePos << endl;
-                //     cout << "   false eng:  " << tmpBest1->falseNeg << endl;
-                //     cout << "   error rate: " << tmpBest1->errorRate << endl;                
-                // }
             }            
         }        
     }
@@ -168,36 +147,14 @@ int main(void) {
                 // it hashes to an existing delta hash
                 if (table[h]) {
                     table[h]->falsePos++;
+
                     updateProbeInfo(table[h]);
                     if (table[h]->errorRate < bestNode->errorRate) bestNode = table[h];
 
-
-                    // if (table[h]->errorRate < tmpBest2->errorRate) {
-                    // // debug
-                    //     tmpBest2 = table[h];
-                    //     cout << "new tmpBest2:  " << endl;
-                    //     cout << "   key:        " << tmpBest2->key << endl;
-                    //     cout << "   probe:      " << sequence[tmpBest2->locations->sequence].substr(tmpBest2->locations->position, K) << endl;
-                    //     cout << "   false pos:  " << tmpBest2->falsePos << endl;
-                    //     cout << "   false neg:  " << tmpBest2->falseNeg << endl;
-                    //     cout << "   error rate: " << tmpBest2->errorRate << endl; 
-                    // }
                 }   
             }   
         }
     }
-    // now find the best node
-    // tmpBest2->errorRate < tmpBest1->errorRate ? bestNode = tmpBest2 : bestNode = tmpBest1;
-    // for (i = 0; i < M - 1; i++) {
-    //     if (table[i]) {
-    //         // now update the statistics and compare
-    //         //updateProbeInfo(table[i]);
-
-    //         if (table[i]->errorRate < bestNode->errorRate) {
-    //             bestNode = table[i];
-    //         }
-    //     }
-    // }
 
     cout << "Best Node: " << endl;
     cout << "   key:        " << bestNode->key << endl;
