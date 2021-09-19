@@ -38,31 +38,6 @@ struct Node {
     Node(int k, int seq, int pos, Node *n) : key(k), next(n) { locations = new pNode(seq, pos, nullptr); }
 };
 
-int hasher(string *seq, int hash, int pos) {
-    // if passing in a 0 hash, calculate the entire initial hash
-    // also, calculate x^N - 1
-    if (hash == 0) {
-        for (int i = 0; i < K; i++) {
-            hash = ((((long long)hash * X) % M) + seq->at(i)) % M;
-            //DEBUG: checking to make sure hash doesn't get screwy
-            if (hash <= 0){
-                cout << "Error! hash is not calculated properly." << endl;
-                exit (1);
-            }
-        }
-    }
-    
-    // if hash already exists, calculate the rolling hash instead
-    // deletes and adds relative to pos - 1 to account for the initialization above
-    else {
-        hash = (((hash + M - (((long long)seq->at(pos - 1) * xTerm) % M) % M) * X) % M
-            + seq->at((pos - 1) + K)) % M;
-    }
-
-    return hash;
-}
-
-
 void deleteTable(Node **table) {
     Node *current;
     Node *prev;
@@ -114,19 +89,6 @@ int calcPower(int length) {
     return xTerm;
 }
 
-int rollingHash(int &hash, int addTerm, int subTerm) {
-    if (xTerm == 1) {
-        cout << "Warning!  X^N - 1 is not pre-computed!" << endl;
-        exit(2);
-    }
-    int h = hash;
-        h = (((h + M - (((long long)subTerm * xTerm) % M) % M) * X) % M
-            + addTerm) % M;
-
-    return h;
-
-}
-
 bool updateTable(Node **table, int &h, int &i, int &j) {
     // if node doesn't exist, create a new one.
     if (table[h] == nullptr) {
@@ -140,6 +102,30 @@ bool updateTable(Node **table, int &h, int &i, int &j) {
 
     return true;
 
+}
+
+int hasher(string *seq, int hash, int pos) {
+    // if passing in a 0 hash, calculate the entire initial hash
+    // also, calculate x^N - 1
+    if (hash == 0) {
+        for (int i = 0; i < K; i++) {
+            hash = ((((long long)hash * X) % M) + seq->at(i)) % M;
+            //DEBUG: checking to make sure hash doesn't get screwy
+            if (hash <= 0){
+                cout << "Error! hash is not calculating properly." << endl;
+                exit (1);
+            }
+        }
+    }
+    
+    // if hash already exists, calculate the rolling hash instead
+    // deletes and adds relative to pos - 1 to account for the initialization above
+    else {
+        hash = (((hash + M - (((long long)seq->at(pos - 1) * xTerm) % M) % M) * X) % M
+            + seq->at((pos - 1) + K)) % M;
+    }
+
+    return hash;
 }
 
 int main(void) {
