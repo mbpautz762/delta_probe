@@ -84,8 +84,8 @@ int strHash(string key) {
     unsigned long h = 0;
 
     // Horner's Rule:
-    for (int i = key.length() - 1; i >= 0; i--) {
-        h = (h * X + key.at(i)) % M;        
+    for (int i = 0; i < key.length(); i++) {
+        h = ((((long long)h * X) % M) + key.at(i)) % M;        
     }
     return h;
 }
