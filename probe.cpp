@@ -5,11 +5,12 @@ using namespace std;
 
 // 10^9 + 9 originally chosen for M based on research on best modulo to prevent collisions.
 // M is number of buckets, and number to modulo by during hashing
-// X is the prime constant used in hashing functions.  5 chosen as a prime number close to 4 
-// (number of different characters in probe, according to polynomial rolling hash theory 
+// X is the prime constant used in hashing functions.
+// xTerm is initial value used to pre-computer X^K-1 
 const int K = 100;
-const int M = 1e7 + 9;
+const int M = 100000007;
 const int X = 5;
+int xTerm = 1;
 
 int N, N_delta;
 string *sequence;
@@ -90,20 +91,24 @@ int strHash(string key) {
     return h;
 }
 
-// int rollingHashUpdate(int hash, int seq, int pos) {
-//     unsigned long temp;
-//     int updatedHash;
-//     int firstTerm = sequence[seq].at(pos);
-//     int lastTerm = sequence[seq].at(pos + K);
-//     temp = (unsigned)pow(X, K - 1) % M;
+int calcPower(int length) {
+    for (int i = 0; i < length - 1; i++) {
+        xTerm = ((long long)xTerm * X) % M;
+    }
 
-//     updatedHash = X * (hash - (firstTerm * temp) % M) + (lastTerm % M);
-//     cout << "updated hash:      " << updatedHash << "   ";
-//     cout << "calculate hash:    " << strHash(sequence[seq].substr(pos + 1, K)) << endl;
+    return xTerm;
+}
 
-//     return updatedHash;
+int rollingHash(string key, int hash, int pos, int length) {
+    if (xTerm == 1) cout << "Warning!  X^N - 1 is not pre-computed" << endl;
+    
+    int h = hash;
+        h = (((h + M - (((long long)key.at(pos) * xTerm) % M) % M) * X) % M
+            + key.at(pos + length)) % M;
 
-// }
+    return h;
+
+}
 
 int main(void) {
     readInput();
