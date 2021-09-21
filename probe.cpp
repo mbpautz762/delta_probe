@@ -3,11 +3,10 @@
 #include <cmath>
 using namespace std;
 
-// 10^9 + 9 originally chosen for M based on research on best modulo to prevent collisions.
 // M is number of buckets, and number to modulo by during hashing
 // X is the prime constant used in hashing functions.
-// xTerm is initial value used to pre-computer X^K-1 
-const int K = 100;
+// xTerm is set to initial value needed to pre-computer X^K-1 in calcPower
+const int K = 50;
 const int M = 100000007;
 const int X = 5;
 int xTerm = 1;
@@ -27,12 +26,13 @@ struct pNode {
 
 struct Node {
     int key;
+    bool evaluated = false;
     int falsePos = 0;
     int falseNeg = N_delta;
     double FPR;
     double FNR;
     double errorRate;
-    pNode * locations;
+    pNode *locations;
     Node *next;
 
     Node(int k, int seq, int pos, Node *n) : key(k), next(n) { locations = new pNode(seq, pos, nullptr); }
@@ -127,62 +127,124 @@ int hasher(string *seq, int hash, int pos) {
 
     return hash;
 }
+// Does position p in sequence[i] match position q in sequence[j] (1 mismatch char ok)?
+bool isMatch(int sourceSeq, int sourcePos, int compareSeq, int comparePos) {
+      int mismatched = 0;
+  for (int k=0; k<K; k++)
+    if (sequence[sourceSeq][sourcePos+k] != sequence[compareSeq][comparePos+k]) {
+      mismatched++;
+      if (mismatched > 1) return false;
+    }
+  return true;
+}
+
 
 int main(void) {
     readInput();
 
     Node **table = new Node *[M] {nullptr};
-    Node *bestNode = new Node(0, 0, 0, nullptr);   
 
     int i = 0, j = 0, h = 0;
     // pre-calc x^N - 1
     xTerm = calcPower(K);
 
-    // loop through all delta sequences
+    // loop through all sequences, delta and covid, hashing every position in every sequence
     for (i = 0; i < N; i++) {
-        // hash a substring of the sequence to table, storing 
+        // hash each position of the sequence to table, storing 
         // sequence and position data in pNode.
-        if (is_delta[i]) {
             h = 0;
             for (j = 0; ((j + K) < sequence[i].length()); j++) {
                 h = hasher(&sequence[i], h, j);
                 
                 updateTable(table, h, i, j);
 
-                table[h]->falseNeg--;
-                updateProbeInfo(table[h]);
-                if (table[h]->errorRate < bestNode->errorRate) bestNode = table[h];
+                // table[h]->falseNeg--;
+                // updateProbeInfo(table[h]);
+                // if (table[h]->errorRate < bestProbe->errorRate) bestProbe = table[h];
             }            
-        }        
+                
     }
     // now, test all covid sequences to check for false positives
-    for (i = 0; i < N; i++) {
-        if (is_delta[i] == false) {
-            h = 0;
-            for (j = 0; (j + K) < sequence[i].length(); j++) {
-                h = hasher(&sequence[i], h, j);
-                // don't actually create nodes.  only check if
-                // it hashes to an existing delta hash
-                if (table[h]) {
-                    table[h]->falsePos++;
+    // for (i = 0; i < N; i++) {
+    //     if (is_delta[i] == false) {
+    //         h = 0;
+    //         for (j = 0; (j + K) < sequence[i].length(); j++) {
+    //             h = hasher(&sequence[i], h, j);
+    //             // don't actually create nodes.  only check if
+    //             // it hashes to an existing delta hash
+    //             if (table[h]) {
+    //                 table[h]->falsePos++;
 
-                    updateProbeInfo(table[h]);
-                    if (table[h]->errorRate < bestNode->errorRate) bestNode = table[h];
+    //                 updateProbeInfo(table[h]);
+    //                 if (table[h]->errorRate < bestProbe->errorRate) bestProbe = table[h];
 
-                }   
-            }   
+    //             }   
+    //         }   
+    //     }
+    // }
+    int lHash, rHash;
+    Node *currentProbe = new Node(0, 0, 0, nullptr);
+    Node *bestProbe = new Node(0, 0, 0, nullptr);
+    bestProbe->errorRate = 1000;
+    Node *probe;
+    pNode *locations;   
+
+
+    for (int i = 0; i < N; i++) {
+        // check every position in every delta sequence
+        if (is_delta[i]) {
+            // start with a fresh hash for hashing function
+            lHash = 0, rHash = 0;
+            for (int j = 0; j + (2 * K) < sequence[i].length(); j++) {
+
+                lHash = hasher(&sequence[i], lHash, j);
+                rHash = hasher(&sequence[i], rHash, j);
+                
+                // ONLY evaluate if that position has not been checked elsewhere
+                // first, look at lHash and all its matching right side locations
+                if (table[lHash]->evaluated == false) {
+                    probe = table[lHash];
+                    locations = probe->locations;
+                    // TODO: Fix it to where it stops looking for matches if a sequence has already been matched
+                    while (locations) {
+                        if (isMatch(i, j + K, locations->sequence, locations->position + K)) {
+                            int matchingSequence = locations->sequence;
+                            // if matching location belongs to a delta sequence, decrement falseNeg
+                            // otherwise, increment false pos
+                            if (is_delta[locations->sequence]) (probe->falseNeg)--;
+                            else (probe->falsePos)++;
+
+                            // if match found, fast forward to the next sequence
+                            while (locations && locations->sequence == matchingSequence) locations = locations->next;
+                            
+                        }
+                        else locations = locations->next;
+                    }
+                    // after looping through all the locations, update stats and compare with bestNode
+
+                }
+                    updateProbeInfo(probe);
+                    if (probe->errorRate < bestProbe->errorRate) bestProbe = probe;                    
+                    probe->evaluated = true;
+
+
+
+
+            
+            }            
         }
+
     }
 
     cout << "Best Node: " << endl;
-    cout << "   key:        " << bestNode->key << endl;
-    cout << "   probe:      " << sequence[bestNode->locations->sequence].substr(bestNode->locations->position, K) << endl;
-    cout << "   false pos:  " << bestNode->falsePos << endl;
-    cout << "   false neg:  " << bestNode->falseNeg << endl;
-    cout << "   error rate: " << bestNode->errorRate << endl;
+    cout << "   key:        " << bestProbe->key << endl;
+    cout << "   probe:      " << sequence[bestProbe->locations->sequence].substr(bestProbe->locations->position, K * 2) << endl;
+    cout << "   false pos:  " << bestProbe->falsePos << endl;
+    cout << "   false neg:  " << bestProbe->falseNeg << endl;
+    cout << "   error rate: " << bestProbe->errorRate << endl;
 
     cout << "   all locations:  " << endl;
-    pNode *tmp = bestNode->locations;
+    pNode *tmp = bestProbe->locations;
     while (tmp) {
         cout << "sequence:  " << tmp->sequence << " position:   " << tmp->position << endl;
         tmp = tmp->next;
