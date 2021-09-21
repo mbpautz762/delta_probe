@@ -198,12 +198,11 @@ int main(void) {
             for (int j = 0; j + (2 * K) < sequence[i].length(); j++) {
 
                 lHash = hasher(&sequence[i], lHash, j);
-                rHash = hasher(&sequence[i], rHash, j);
                 
                 // ONLY evaluate if that position has not been checked elsewhere
                 // first, look at lHash and all its matching right side locations
                 if (table[lHash]->evaluated == false) {
-                    probe = table[lHash];
+                    currentProbe = probe = table[lHash];
                     locations = probe->locations;
                     // TODO: Fix it to where it stops looking for matches if a sequence has already been matched
                     while (locations) {
@@ -211,8 +210,8 @@ int main(void) {
                             int matchingSequence = locations->sequence;
                             // if matching location belongs to a delta sequence, decrement falseNeg
                             // otherwise, increment false pos
-                            if (is_delta[locations->sequence]) (probe->falseNeg)--;
-                            else (probe->falsePos)++;
+                            if (is_delta[locations->sequence]) (currentProbe->falseNeg)--;
+                            else (currentProbe->falsePos)++;
 
                             // if match found, fast forward to the next sequence
                             while (locations && locations->sequence == matchingSequence) locations = locations->next;
@@ -223,8 +222,8 @@ int main(void) {
                     // after looping through all the locations, update stats and compare with bestNode
 
                 }
-                    updateProbeInfo(probe);
-                    if (probe->errorRate < bestProbe->errorRate) bestProbe = probe;                    
+                    updateProbeInfo(currentProbe);
+                    if (currentProbe->errorRate < bestProbe->errorRate) bestProbe = currentProbe;                    
                     probe->evaluated = true;
 
 
