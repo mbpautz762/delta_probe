@@ -1,13 +1,12 @@
 #include <iostream>
 #include <fstream>
-#include <cmath>
 using namespace std;
 
 // M is number of buckets, and number to modulo by during hashing
 // X is the prime constant used in hashing functions.
 // xTerm is set to initial value needed to pre-computer X^K-1 in calcPower
 const int K = 50;
-const int M = 100000007;
+const int M = 1000000007;
 const int X = 5;
 int xTerm = 1;
 
@@ -15,27 +14,42 @@ int N, N_delta;
 string *sequence;
 bool *is_delta;
 
+
+
 struct pNode {
     int sequence;
     int position;
     pNode *next;
 
     pNode(int seq, int pos, pNode *n) : sequence(seq), position(pos), next(n) {;}
+    // simplified constructor for only holding the sequence info
+    pNode(int seq, pNode *n) : sequence(seq), next(n) {;}
 
 };
 
 struct Node {
     int key;
-    bool evaluated = false;
+    pNode *locations;
+    Node *next;
+
+    Node(int k, int seq, int pos, Node *n) : key(k), next(n) { locations = new pNode(seq, pos, nullptr); }
+};
+
+struct Probe {
+    int lH;
+    int rH;
+    int firstSeq;
+    int firstPos;
     int falsePos = 0;
     int falseNeg = N_delta;
     double FPR;
     double FNR;
     double errorRate;
-    pNode *locations;
-    Node *next;
+    bool* seqMatches;
 
-    Node(int k, int seq, int pos, Node *n) : key(k), next(n) { locations = new pNode(seq, pos, nullptr); }
+    Probe(int n) {
+        seqMatches = new bool[n];
+    }
 };
 
 void deleteTable(Node **table) {
@@ -59,7 +73,7 @@ void deleteTable(Node **table) {
     return;
 }
 
-void updateProbeInfo(Node *ptr) {
+void updateProbeInfo(Probe *ptr) {
     ptr->FPR = ((double)(ptr->falsePos) / (N - N_delta));
     ptr->FNR = ((double)(ptr->falseNeg) / (N_delta));
     ptr->errorRate = 2.0 * (ptr->FPR) + 1.0 * (ptr->FNR);
@@ -88,17 +102,29 @@ int calcPower(int length) {
 
     return xTerm;
 }
-
-bool updateTable(Node **table, int &h, int &i, int &j) {
-    // if node doesn't exist, create a new one.
+// checks if a key is in the hash table.  if it is, that key's
+// location info is added into it's pNode.  if not found, 
+// a new node is added
+bool updateTable(Node **table, int h, int i, int j) {
     if (table[h] == nullptr) {
         table[h] = new Node(h, i, j, table[h]);
+        return true;
     }
-    // if hashed index exists, instead of making a new node, 
-    // just add a new link in the pNode list to add the additional position information
-    else if (table[h]) {
-        table[h]->locations = new pNode(i, j, table[h]->locations);
+
+    else {
+        Node *tmp = table[h];
+        while (tmp) {
+            if (tmp->key == h) {
+                tmp->locations = new pNode(i, j, tmp->locations);
+                return true;
+            }
+            else tmp = tmp->next;
+        }
+        // if matching key not already in table, it is a collision.
+        // add a new link in the node
+        table[h] = new Node(h, i, j, table[h]);
     }
+
 
     return true;
 
@@ -127,6 +153,16 @@ int hasher(string *seq, int hash, int pos) {
 
     return hash;
 }
+
+int hashChecker(string *seq, int hash, int pos) {
+    int h = 0;
+    for (int i = 0; i < K; i++) {
+        h = ((((long long)h * X) % M) + seq->at(i + pos)) % M;
+    }
+
+    return h;
+}
+
 // Does position p in sequence[i] match position q in sequence[j] (1 mismatch char ok)?
 bool isMatch(int sourceSeq, int sourcePos, int compareSeq, int comparePos) {
       int mismatched = 0;
@@ -137,6 +173,8 @@ bool isMatch(int sourceSeq, int sourcePos, int compareSeq, int comparePos) {
     }
   return true;
 }
+
+
 
 
 int main(void) {
@@ -155,39 +193,23 @@ int main(void) {
             h = 0;
             for (j = 0; ((j + K) < sequence[i].length()); j++) {
                 h = hasher(&sequence[i], h, j);
+                // cout << "rolling: " << h;
+                // cout << "  checked: " << hashChecker(&sequence[i], h, j) << endl;
                 
                 updateTable(table, h, i, j);
 
-                // table[h]->falseNeg--;
-                // updateProbeInfo(table[h]);
-                // if (table[h]->errorRate < bestProbe->errorRate) bestProbe = table[h];
             }            
                 
     }
-    // now, test all covid sequences to check for false positives
-    // for (i = 0; i < N; i++) {
-    //     if (is_delta[i] == false) {
-    //         h = 0;
-    //         for (j = 0; (j + K) < sequence[i].length(); j++) {
-    //             h = hasher(&sequence[i], h, j);
-    //             // don't actually create nodes.  only check if
-    //             // it hashes to an existing delta hash
-    //             if (table[h]) {
-    //                 table[h]->falsePos++;
 
-    //                 updateProbeInfo(table[h]);
-    //                 if (table[h]->errorRate < bestProbe->errorRate) bestProbe = table[h];
-
-    //             }   
-    //         }   
-    //     }
-    // }
     int lHash, rHash;
-    Node *currentProbe = new Node(0, 0, 0, nullptr);
-    Node *bestProbe = new Node(0, 0, 0, nullptr);
+    Probe *currentProbe = new Probe(N);
+    Probe *bestProbe = new Probe(N);
     bestProbe->errorRate = 1000;
+
     Node *probe;
-    pNode *locations;   
+    pNode *locations;
+
 
 
     for (int i = 0; i < N; i++) {
@@ -196,35 +218,66 @@ int main(void) {
             // start with a fresh hash for hashing function
             lHash = 0, rHash = 0;
             for (int j = 0; j + (2 * K) < sequence[i].length(); j++) {
-
                 lHash = hasher(&sequence[i], lHash, j);
-                
-                // ONLY evaluate if that position has not been checked elsewhere
-                // first, look at lHash and all its matching right side locations
-                if (table[lHash]->evaluated == false) {
-                    currentProbe = probe = table[lHash];
-                    locations = probe->locations;
-                    // TODO: Fix it to where it stops looking for matches if a sequence has already been matched
-                    while (locations) {
-                        if (isMatch(i, j + K, locations->sequence, locations->position + K)) {
-                            int matchingSequence = locations->sequence;
-                            // if matching location belongs to a delta sequence, decrement falseNeg
-                            // otherwise, increment false pos
-                            if (is_delta[locations->sequence]) (currentProbe->falseNeg)--;
-                            else (currentProbe->falsePos)++;
+                rHash = hasher(&sequence[i], rHash, (j + K));
+                // cout << "lhash: " << lHash << " checked: " << hashChecker(&sequence[i], lHash, j) << endl;
+                // cout << "rhash: " << rHash << " checked: " << hashChecker(&sequence[i], rHash, (j + K)) << endl;
 
-                            // if match found, fast forward to the next sequence
-                            while (locations && locations->sequence == matchingSequence) locations = locations->next;
-                            
-                        }
-                        else locations = locations->next;
+                currentProbe->firstSeq = i;
+                currentProbe->firstPos = j;
+                currentProbe->lH = lHash;
+                currentProbe->rH = rHash;
+                // first, check all left hash locations for a matching right hash
+                if (table[lHash]) {
+                    Node *match = table[lHash];
+                    // advance to the node of the key you're checking (in case of collisions)
+                    while (match->key != lHash) {
+                        match = match->next;
                     }
-                    // after looping through all the locations, update stats and compare with bestNode
 
+                    pNode *locs = match->locations;
+                    while (locs) {
+                        // NOTE: I reversed the order of the arguments in isMatch and for some reason it works better than before.  WHY
+                        if (isMatch(locs->sequence, locs->position + K, i, j)) {
+                            // isMatch(i, j + K, locs->sequence, locs->position + K)) {
+                            // if match found in delta location, decrement falsePos, 
+                            // otherwise, increment falseNeg.  Then add location to 
+                            // bool array to track when checking the right hashes
+                            if (is_delta[locs->sequence]) (currentProbe->falseNeg)--;
+                            else (currentProbe->falsePos)++;
+                            currentProbe->seqMatches[locs->sequence] = true;
+                        }
+
+                        locs = locs->next;
+                    }
                 }
-                    updateProbeInfo(currentProbe);
-                    if (currentProbe->errorRate < bestProbe->errorRate) bestProbe = currentProbe;                    
-                    probe->evaluated = true;
+                // now, check all the right hashes.  only update statistics if a match was
+                // not already found on the sequence
+                if (table[rHash]) {
+                    Node *match = table[rHash];
+                    // advance to the node of the key you're checking (in case of collisions)
+                    while (match->key != rHash) {
+                        match = match->next;
+                    }
+                    pNode *locs = match->locations;
+                    while (locs) {
+                        // skip locations on sequences that have already matched
+                        // take advantage of short circuiting here
+                        if (currentProbe->seqMatches[locs->sequence] == false && isMatch(locs->sequence, locs->position - K, i, j - K)) {
+                        // isMatch(i, j - K, locs->sequence, locs->position - K)) {
+                            if (is_delta[locs->sequence]) (currentProbe->falseNeg)--;
+                            else (currentProbe->falsePos)++;
+                            currentProbe->seqMatches[locs->sequence] = true;
+                        }
+
+                        locs = locs->next;                   
+
+                    }
+                }
+                updateProbeInfo(currentProbe);
+                if (currentProbe->errorRate < bestProbe->errorRate) bestProbe = currentProbe;
+                
+                   
 
 
 
@@ -236,18 +289,13 @@ int main(void) {
     }
 
     cout << "Best Node: " << endl;
-    cout << "   key:        " << bestProbe->key << endl;
-    cout << "   probe:      " << sequence[bestProbe->locations->sequence].substr(bestProbe->locations->position, K * 2) << endl;
+    cout << "   probe:      " << sequence[bestProbe->firstSeq].substr(bestProbe->firstPos, K * 2) << endl;
+    cout << "   left hash:  " << bestProbe->lH << endl;
+    cout << "   left hash:  " << bestProbe->rH << endl;
     cout << "   false pos:  " << bestProbe->falsePos << endl;
     cout << "   false neg:  " << bestProbe->falseNeg << endl;
     cout << "   error rate: " << bestProbe->errorRate << endl;
 
-    cout << "   all locations:  " << endl;
-    pNode *tmp = bestProbe->locations;
-    while (tmp) {
-        cout << "sequence:  " << tmp->sequence << " position:   " << tmp->position << endl;
-        tmp = tmp->next;
-    }
 
     deleteTable(table);
 
