@@ -179,43 +179,39 @@ void Table::deleteTable() {
 }
 // holds information about the K-length probe
 class Probe {
-    public:
+    private:
+        double FPR;
+        double FNR;
+        double errorRate;
         int lH;
         int rH;
         int firstSeq;
         int firstPos;
         int falsePos = 0;
         int falseNeg = N_delta;
-        double FPR;
-        double FNR;
-        double errorRate;
+
         bool* seqMatches;
+
+    public:
 
         Probe() { seqMatches = new bool[N] {false}; }
         ~Probe() { ; }
 
         Probe(int lhash, int rhash, int i, int j) : lH(lhash), rH(rhash), firstSeq(i), firstPos(j) {seqMatches = new bool[N] {false};}
-        // int getlHash() { return lH; }
-        // int getrHash() { return rH; }
-        // int getSeq() { return firstSeq; }
-        // int getPos() { return firstPos; }
-        // int getFalsePositives() { return falsePos; }
-        // int getFalseNegatives() { return falseNeg; }
-        // double getFPR() { return FPR; }
-        // double getFNR() { return FNR; }
-        // double getErrorRate() { return errorRate; }
-        // bool getSeqMatches() { return seqMatches; }
-        // bool is_SeqMatched(int i) { return seqMatches[i]; }
+        int getlHash() { return lH; }
+        int getrHash() { return rH; }
+        int getSeq() { return firstSeq; }
+        int getPos() { return firstPos; }
+        int getFalsePositives() { return falsePos; }
+        int getFalseNegatives() { return falseNeg; }
+        double getFPR() { return FPR; }
+        double getFNR() { return FNR; }
+        double getErrorRate() { return errorRate; }
 
-        // // setters
-        // void setSeqMatch(int i) { seqMatches[i] = true;}
-        // void setlHash(int h) { lH = h; }
-        // void setrHash(int h) { rH = h; }
-        // void setSeq(int seq) { firstSeq = seq; }
-        // void setPos(int pos) { firstPos = pos; }
-        // void decrementFN() { falseNeg--; }
-        // void incrementFP() { falsePos++ ;}
+        // setters
+        void setErrorRate(int val) { errorRate = val; }
 
+        // methods
         bool evaluate(Node *match, int seq, int pos);
         void updateInfo();
         void reset(int lHash, int rHash, int i, int j); 
@@ -334,7 +330,7 @@ int main(void) {
     int lHash, rHash;
     Probe bestProbe;
     Probe currentProbe;
-    bestProbe.errorRate = 9999;
+    bestProbe.setErrorRate(9999);
 
     for (int i = 0; i < N; i++) {
         // check every position in every delta sequence
@@ -366,19 +362,19 @@ int main(void) {
                 // all evaluations are done - update probe statistics and compare
                 currentProbe.updateInfo();
 
-                if (currentProbe.errorRate < bestProbe.errorRate) bestProbe = currentProbe;
+                if (currentProbe.getErrorRate() < bestProbe.getErrorRate()) bestProbe = currentProbe;
             }            
         }
     }
     cout << "Best Probe: " << endl;
-    cout << "   probe:      " << sequence[bestProbe.firstSeq].substr(bestProbe.firstPos, K) << endl;
-    cout << "   left hash:  " << bestProbe.lH << endl;
-    cout << "   left hash:  " << bestProbe.rH << endl;
-    cout << "   false pos:  " << bestProbe.falsePos << endl;
-    cout << "   false neg:  " << bestProbe.falseNeg << endl;
-    cout << "   error rate: " << bestProbe.errorRate << endl;
-    cout << "   sequence:   " << bestProbe.firstSeq << endl;
-    cout << "   position:   " << bestProbe.firstPos << endl;
+    cout << "   probe:      " << sequence[bestProbe.getSeq()].substr(bestProbe.getSeq(), K) << endl;
+    cout << "   left hash:  " << bestProbe.getlHash() << endl;
+    cout << "   left hash:  " << bestProbe.getrHash() << endl;
+    cout << "   false pos:  " << bestProbe.getFalsePositives() << endl;
+    cout << "   false neg:  " << bestProbe.getFalseNegatives() << endl;
+    cout << "   error rate: " << bestProbe.getErrorRate() << endl;
+    cout << "   sequence:   " << bestProbe.getSeq() << endl;
+    cout << "   position:   " << bestProbe.getPos() << endl;
 
     delete[] sequence;
     delete[] is_delta;
