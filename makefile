@@ -6,7 +6,7 @@
 # makefile for programming assignment 2
 
 CC=g++
-CFLAGS= -Wall -g
+CFLAGS= -Wall -g -O9
 TARGET=probe
 FILE=
 
@@ -32,3 +32,9 @@ leakcheck:
 
 clean:
 	rm $(TARGET) $(OBJS)
+
+debug:
+	gdb -tui ./$(TARGET) $(FILE)
+
+time:
+	time ./$(TARGET)
