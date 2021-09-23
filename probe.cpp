@@ -33,7 +33,7 @@ void readInput(void)
     if (is_delta[i]) N_delta++;
   }
 }
-
+// holds location information for Node
 struct pNode {
     int sequence;
     int position;
@@ -44,7 +44,7 @@ struct pNode {
     pNode(int seq, pNode *n) : sequence(seq), next(n) {;}
 
 };
-
+// holds a hashed sequence, and its associated location information
 struct Node {
     int key;
     pNode *locations;
@@ -53,7 +53,6 @@ struct Node {
     Node(int k, int seq, int pos, Node *n) : key(k), next(n) { locations = new pNode(seq, pos, nullptr); }
     Node(int k, pNode *p, Node *n) : key(k), next(n), locations(p) {;}
 };
-
 class Table {
     private:
         int N = 0;
@@ -64,6 +63,8 @@ class Table {
 
     public:
         Table();
+        ~Table();
+
         Node *find(int key);
         void insert(int key, int seq, int pos);
         void print(void);
@@ -74,96 +75,104 @@ class Table {
         void deleteTable();
 };
 
-Table::Table() {
-    
-    table = new Node *[M] {nullptr};
-}
+Table::Table() { table = new Node *[M] {nullptr}; }
+Table::~Table() { deleteTable(); }
 
+// search for a key in a hashed bucket
+// if found, returns a pointer to the containing node
 Node *Table::find(int key) {
-  int h = hash(key, M);
-
-  /* search for key in hashed bucket... */
-
+    int h = hash(key, M);
     if (table[h]) {
-    Node *tmp = table[h];
-    while (tmp) {
-      if (key == tmp->key) return tmp;
-      tmp = tmp->next;
+        Node *tmp = table[h];
+        while (tmp) {
+            if (key == tmp->key) return tmp;
+            tmp = tmp->next;
+        }
     }
-  }
+    // if no match, return null
   return nullptr;
 }
 
 void Table::insert(int key, int seq, int pos) {
+    int i, h;
 
-    // void deleteTable(Node **table);
-    int i, h;    
+    // check if the table needs to be upsized at time of insert    
     if (N > (2 * M) ) {
+        Node **newTable = new Node *[M * 2] {nullptr};
+        Node *tmp;
+        Node *prev;
 
-    Node **newTable = new Node *[M * 2] {nullptr};
-    Node *tmp;
-    Node *prev;
-
-    for (int i = 0; i < M; i++) {
-        tmp = table[i];
-          while (tmp) {
-            h = hash(tmp->key, (M * 2));
-            newTable[h] = new Node(tmp->key, tmp->locations, newTable[h]);
-
-            // while advancing to next node, free the memory
-            // at current position in the old table.
-            // since we're already here, why not?
-            prev = tmp;
-            tmp = tmp->next;
-            delete prev;
-          }                  
+        for (int i = 0; i < M; i++) {
+            tmp = table[i];
+            while (tmp) {
+                h = hash(tmp->key, (M * 2));
+                newTable[h] = new Node(tmp->key, tmp->locations, newTable[h]);
+                tmp = tmp->next;
+            }                  
+        }
+        // double the table size AFTER re-hashing everything
+        M *= 2;
+        deleteTable();
+        table = newTable;
     }
+    // now we insert the new node.
+    // if key already exists in table, just add new location info
+    N++;
 
-    M *= 2;
-
-    delete [] table;
-    // deleteTable(table);
-
-    table = newTable;
-  }
-  
-  N++;
-
-  // hash location doesn't exist, or if the key isn't found at that location
-  // add a new node
     h = hash(key, M);
     if (table[h] == nullptr || (!find(key)) ) {
         table[h] = new Node(key, seq, pos, table[h]);
     }
-    // otherwise, add the sequence and position to the matching
-    // node's pNode
     else {
         Node *tmp = find(key);
         tmp->locations = new pNode(seq, pos, tmp->locations);
-  }
-
-  return;  
+    }
 }
-
+// more for debugging than anything else
 void Table::print(void) {
     Node *tmp;
     pNode *p;
-    for (int i=0; i<M; i++)
-    if (table[i]) {
-      tmp = table[i];
-      p = table[i]->locations;
-      while (tmp) {
-          cout << "\nindex position: " << i << "\n-------------";
-        cout << "\nkey: " << tmp->key;
-        while (p) {
-            cout << " locs: " << p->sequence << " " << p->position;
-            p = p->next;
+        for (int i=0; i<M; i++){
+        if (table[i]) {
+            tmp = table[i];
+            p = table[i]->locations;
+            while (tmp) {
+                cout << "\nkey: " << tmp->key;
+            while (p) {
+                cout << " locs: " << p->sequence << " " << p->position;
+                p = p->next;
+            }
+            tmp = tmp->next;
+            }
         }
-        tmp = tmp->next;
-      }
     }
 }
+// systematically frees all nodes, and all associated pNodes
+void Table::deleteTable() {
+    Node *current;
+    Node *prev;
+    pNode *loc;
+    pNode *locPrev;
+    for (int i = 0; i < M; i++) {
+        current = table[i];
+        while (current) {
+            prev = current;
+            if (current->locations) loc = current->locations; {
+                while (loc) {
+                    locPrev = loc;
+                    loc = loc->next;
+                    delete locPrev;
+                }
+            }
 
+            current = current->next;
+            delete prev;
+        }            
+    }
+    delete[] table;
+    return;
+}
+// holds information about the K-length probe
 class Probe {
     public:
         int lH;
@@ -177,12 +186,9 @@ class Probe {
         double errorRate;
         bool* seqMatches;
 
-        Probe() {
-            seqMatches = new bool[N] {false};
-        }
-        // ~Probe() {
-        //     delete [] seqMatches;
-        // }
+        Probe() { seqMatches = new bool[N] {false}; }
+        ~Probe() { ; }
+
         Probe(int lhash, int rhash, int i, int j) : lH(lhash), rH(rhash), firstSeq(i), firstPos(j) {seqMatches = new bool[N] {false};}
         // int getlHash() { return lH; }
         // int getrHash() { return rH; }
@@ -205,110 +211,40 @@ class Probe {
         // void decrementFN() { falseNeg--; }
         // void incrementFP() { falsePos++ ;}
 
-        bool evaluate(Node *match, int seq, int pos) {
-            bool isMatch(int sourceSeq, int sourcePos, int compareSeq, int comparePos);
-            pNode *locs = match->locations;
-            while (locs) {
-                if (seqMatches[locs->sequence] == false 
-                    && isMatch(seq, pos, locs->sequence, pos)) {
-                    // isMatch(i, j + K, locs->sequence, locs->position + K)) {
-                    // if match found in delta location, decrement falsePos, 
-                    // otherwise, increment falseNeg.  Then add location to 
-                    // bool array to track when checking the right hashes
-                    if (is_delta[locs->sequence]) (falseNeg)--;
-                    if (!is_delta[locs->sequence]) (falsePos)++;
-
-                    seqMatches[locs->sequence] = true;
-                }
-
-                locs = locs->next;
-            }        
-            return true;
-        }
-
-        void updateInfo() {
-            FPR = ((double)(falsePos) / (N - N_delta));
-            FNR = ((double)(falseNeg) / (N_delta));
-            errorRate = (2.0 * FPR) + (1.0 * FNR);
-
-            return;
-        }
-
-        void reset(int lHash, int rHash, int i, int j) {
-            lH = lHash;
-            rH = rHash;
-            firstSeq = i;
-            firstPos = j;
-            falsePos = 0;
-            falseNeg = N_delta;
-            delete [] seqMatches;
-            seqMatches = new bool[N] {false};
-
-        }
-
-        void cleanup(){
-            delete [] seqMatches;
-        }
-
-
-        
-
-
+        bool evaluate(Node *match, int seq, int pos);
+        void updateInfo();
+        void reset(int lHash, int rHash, int i, int j); 
+        void cleanup();    
 };
 
-void Table::deleteTable() {
-    Node *current;
-    Node *prev;
-    pNode *loc;
-    pNode *locPrev;
-    // TODO: figure out how to delete pNode memory properly
-    // and add to this funciton
-    for (int i = 0; i < M; i++) {
-        current = table[i];
-        if (current) {
-            while (current) {
-                prev = current;
-                if (current->locations) loc = current->locations; {
-                    while (loc) {
-                        locPrev = loc;
-                        loc = loc->next;
-                        delete locPrev;
-                    }
-                }
+// evaluates a probe's effectiveness
+// tracks match locations to prevent double matching
+bool Probe::evaluate(Node *match, int seq, int pos) {
+    bool isMatch(int sourceSeq, int sourcePos, int compareSeq, int comparePos);
+    pNode *locs = match->locations;
+    while (locs) {
+        if (seqMatches[locs->sequence] == false 
+            && isMatch(seq, pos, locs->sequence, pos)) {
+            // if match found in delta location, decrement falsePos, 
+            // otherwise, increment falseNeg.  Then add location to 
+            // bool array to track when checking the right hashes
+            if (is_delta[locs->sequence]) (falseNeg)--;
+            if (!is_delta[locs->sequence]) (falsePos)++;
 
-                current = current->next;
-                delete prev;
-            }            
+            seqMatches[locs->sequence] = true;
         }
+        locs = locs->next;
+    }        
+    return true;
+}
 
-    }
-    delete[] table;
+void Probe::updateInfo() {
+    FPR = ((double)(falsePos) / (N - N_delta));
+    FNR = ((double)(falseNeg) / (N_delta));
+    errorRate = (2.0 * FPR) + (1.0 * FNR);
 
     return;
 }
-
-// void updateProbeInfo(Probe *ptr) {
-//     ptr->FPR = ((double)(ptr->falsePos) / (N - N_delta));
-//     ptr->FNR = ((double)(ptr->falseNeg) / (N_delta));
-//     ptr->errorRate = 2.0 * (ptr->FPR) + 1.0 * (ptr->FNR);
-// }
-// void probeReset(Probe *probe, int lhash, int rhash, int i, int j) {
-//     probe->falseNeg = N_delta;
-//     probe->falsePos = 0;
-//     updateProbeInfo(probe);
-//     probe->seqMatches = new bool[N] {false};
-//     probe->lH = lhash;
-//     probe->rH = rhash;
-//     probe->firstSeq = i;
-//     probe->firstPos = j;
-
-//     return;
-
-
-
-// }
-
-
 
 int calcPower(int length) {
     for (int i = 0; i < length - 1; i++) {
@@ -317,33 +253,6 @@ int calcPower(int length) {
 
     return xTerm;
 }
-// checks if a key is in the hash table.  if it is, that key's
-// location info is added into it's pNode.  if not found, 
-// a new node is added
-// bool updateTable(Node **table, int h, int i, int j) {
-//     if (table[h] == nullptr) {
-//         table[h] = new Node(h, i, j, table[h]);
-//         return true;
-//     }
-
-//     else {
-//         Node *tmp = table[h];
-//         while (tmp) {
-//             if (tmp->key == h) {
-//                 tmp->locations = new pNode(i, j, tmp->locations);
-//                 return true;
-//             }
-//             else tmp = tmp->next;
-//         }
-//         // if matching key not already in table, it is a collision.
-//         // add a new link in the node
-//         table[h] = new Node(h, i, j, table[h]);
-//     }
-
-
-//     return true;
-
-//}
 
 int hasher(string *seq, int hash, int pos) {
     // if passing in a 0 hash, calculate the entire initial hash
@@ -364,180 +273,98 @@ int hasher(string *seq, int hash, int pos) {
 
     return hash;
 }
-// hashes an entire sequence starting at pos and ending at position + K.
-// meant for debugging / checking the hasher function
-// int hashChecker(string *seq, int hash, int pos) {
-//     int h = 0;
-//     for (int i = 0; i < hashSize; i++) {
-//         h = ((((long long)h * X) % P) + seq->at(i + pos)) % P;
-//     }
-
-//     return h;
-// }
-
-// Does position p in sequence[i] match position q in sequence[j] (1 mismatch char ok)?
-bool isMatch(int sourceSeq, int sourcePos, int compareSeq, int comparePos) {
-      int mismatched = 0;
-  for (int k=0; k < hashSize; k++)
-    if (sequence[sourceSeq][sourcePos+k] != sequence[compareSeq][comparePos+k]) {
-      mismatched++;
-      if (mismatched > 1) return false;
-    }
-  return true;
+// re-initializes probe with fresh info
+void Probe::reset(int lHash, int rHash, int i, int j) {
+    lH = lHash;
+    rH = rHash;
+    firstSeq = i;
+    firstPos = j;
+    falsePos = 0;
+    falseNeg = N_delta;
+    delete [] seqMatches;
+    seqMatches = new bool[N] {false};
 }
 
-// bool evaluateProbe(Probe *probe, Node * match, int seq, int pos) {
-//     pNode *locs = match->locations;
-//     while (locs) {
-//         if (probe->seqMatches[locs->sequence] == false 
-//             && isMatch(seq, pos, locs->sequence, pos)) {
-//             // isMatch(i, j + K, locs->sequence, locs->position + K)) {
-//             // if match found in delta location, decrement falsePos, 
-//             // otherwise, increment falseNeg.  Then add location to 
-//             // bool array to track when checking the right hashes
-//             if (is_delta[locs->sequence]) (probe->falseNeg)--;
-//             if (!is_delta[locs->sequence]) (probe->falsePos)++;
-
-//             probe->seqMatches[locs->sequence] = true;
-//         }
-
-//         locs = locs->next;
-//     }
-
-//     return true;
-
-// }
+// clears bool array and frees memory.  used instead of destructor to preven
+// a double-free issue
+void Probe::cleanup(){
+    delete [] seqMatches;
+}
 
 
+// The expensive check: checks a matching location char by char for a match,
+// allowing up to one mismatching character.
+bool isMatch(int sourceSeq, int sourcePos, int compareSeq, int comparePos) {
+    int mismatched = 0;
+    for (int k=0; k < hashSize; k++) {
+        if (sequence[sourceSeq][sourcePos+k] != sequence[compareSeq][comparePos+k]) {
+            mismatched++;
+            if (mismatched > 1) return false;
+        }
+    }
+    return true;
+}
 
 
 int main(void) {
+
     readInput();
 
-    // Node **table = new Node *[P] {nullptr};
     Table table;
-
     int i = 0, j = 0, h = 0;
-    // pre-calc x^N - 1
+
+    // pre-calc x^N - 1 for hashing function
     xTerm = calcPower(hashSize);
 
-    // loop through all sequences, delta and covid, hashing every position in every sequence
+    // loop through all sequences, delta and covid, hashing each position in every sequence.  
+    // sequence and position information stored in pNode
     for (i = 0; i < N; i++) {
-        // hash each position of the sequence to table, storing 
-        // sequence and position data in pNode.
-            h = 0;
-            for (j = 0; ((j + hashSize) < sequence[i].length()); j++) {
-                h = hasher(&sequence[i], h, j);
-                // cout << "rolling: " << h;
-                // cout << "  checked: " << hashChecker(&sequence[i], h, j) << endl;
-                
-                // updateTable(table, h, i, j);
-                table.insert(h, i, j);
-
-
-            }            
+        h = 0;
+        for (j = 0; ((j + hashSize) < sequence[i].length()); j++) {
+            h = hasher(&sequence[i], h, j);
+            table.insert(h, i, j);
+        }            
                 
     }
-    // debug lines
-    // table.print();
-    // cout << "size of table: " << table.getN() << endl;
-
-
     int lHash, rHash;
-    // Probe *currentProbe = new Probe();
     Probe bestProbe;
     Probe currentProbe;
     bestProbe.errorRate = 9999;
 
-
-// Node *tmp;
-
     for (int i = 0; i < N; i++) {
         // check every position in every delta sequence
         if (is_delta[i]) {
-            // start with a fresh hash for hashing function
+            // start with a fresh hash - required for hashing function
             lHash = 0, rHash = 0;
             for (int j = 0; j + K < sequence[i].length(); j++) {
                 lHash = hasher(&sequence[i], lHash, j);
                 rHash = hasher(&sequence[i], rHash, (j + hashSize));
-                // debug lines
-                // tmp = table.find(lHash);
-                // if (tmp == nullptr) cout << "lHash NOT found." << endl;
-                // tmp = table.find(rHash);
-                // if (tmp == nullptr) cout << "rHash NOT found." << endl;
-                // cout << "lhash: " << lHash << " checked: " << hashChecker(&sequence[i], lHash, j) << endl;
-                // cout << "rhash: " << rHash << " checked: " << hashChecker(&sequence[i], rHash, (j + hashSize)) << endl;
                 currentProbe.reset(lHash, rHash, i, j);
-                // probeReset(currentProbe, lHash, rHash, i, j);
+
                 // first, check all left hash locations for a matching right hash
-                // Node *match = table[lHash];
                 Node *match = table.getTableEntry(lHash);
+
                 // advance to the node of the key you're checking (in case of collisions)
                 while (match->key != lHash) {
                     match = match->next;
                 }
-                // evaluateProbe(currentProbe, match, i, j + hashSize);
                 currentProbe.evaluate(match, i, j + hashSize);
 
-                // pNode *locs = match->locations;
-                // while (locs) {
-                //     (currentProbe->falseNeg)++;
-                //     if (isMatch(i, j + hashSize, locs->sequence, locs->position + hashSize)) {
-                //         // isMatch(i, j + K, locs->sequence, locs->position + K)) {
-                //         // if match found in delta location, decrement falsePos, 
-                //         // otherwise, increment falseNeg.  Then add location to 
-                //         // bool array to track when checking the right hashes
-                //         if (is_delta[locs->sequence]) (currentProbe->falseNeg)--;
-                //         if (!is_delta[locs->sequence]) (currentProbe->falsePos)++;
-
-                //         currentProbe->seqMatches[locs->sequence] = true;
-                //     }
-
-                //     locs = locs->next;
-                // }
-                
-
                 // now, check all the right hashes.  only update statistics if a match was
-                // not already found on the sequence
-                // match = table[rHash];
+                // not already found on that particular sequence
                 match = table.getTableEntry(rHash);
-                // advance to the node of the key you're checking (in case of collisions)
                 while (match->key != rHash) {
                     match = match->next;
                 }
-                // evaluateProbe(currentProbe, match, i, j);
                 currentProbe.evaluate(match, i, j);
-            //     locs = match->locations;
-            //     while (locs) {
-            //         // skip locations on sequences that have already matched
-            //         // take advantage of short circuiting here
-            //         if (currentProbe->seqMatches[locs->sequence] == false 
-            //             && isMatch(i, j, locs->sequence, locs->position)) {
-            //         // isMatch(i, j - K, locs->sequence, locs->position - K)) {
-            //             if (is_delta[locs->sequence]) (currentProbe->falseNeg)--;
-            //             else (currentProbe->falsePos)++;
-            //         }
 
-            //         locs = locs->next;                   
-
-                
-            // }
+                // all evaluations are done - update probe statistics and compare
                 currentProbe.updateInfo();
+
                 if (currentProbe.errorRate < bestProbe.errorRate) bestProbe = currentProbe;
-
-                // delete currentProbe;
-                
-                   
-
-
-
-
-            
             }            
         }
-
     }
-
     cout << "Best Probe: " << endl;
     cout << "   probe:      " << sequence[bestProbe.firstSeq].substr(bestProbe.firstPos, K) << endl;
     cout << "   left hash:  " << bestProbe.lH << endl;
@@ -547,9 +374,6 @@ int main(void) {
     cout << "   error rate: " << bestProbe.errorRate << endl;
     cout << "   sequence:   " << bestProbe.firstSeq << endl;
     cout << "   position:   " << bestProbe.firstPos << endl;
-
-
-    table.deleteTable();
 
     delete[] sequence;
     delete[] is_delta;
