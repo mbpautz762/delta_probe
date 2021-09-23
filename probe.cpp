@@ -19,8 +19,8 @@ bool *is_delta;
 
 void readInput(void)
 {
-//   ifstream input("covid.txt");
-  ifstream input("covidsmall.txt");
+  ifstream input("covid.txt");
+//   ifstream input("covidsmall.txt");
   string label, seq;
   while (input >> label >> seq) N++;
   input.clear();
@@ -107,12 +107,17 @@ void Table::insert(int key, int seq, int pos) {
             while (tmp) {
                 h = hash(tmp->key, (M * 2));
                 newTable[h] = new Node(tmp->key, tmp->locations, newTable[h]);
+                // while advancing to next node, free the memory
+                // at current position in the old table.
+                // since we're already here, why not?
+                prev = tmp;
                 tmp = tmp->next;
-            }                  
+                delete prev;            }                  
         }
         // double the table size AFTER re-hashing everything
         M *= 2;
-        deleteTable();
+
+        delete [] table;
         table = newTable;
     }
     // now we insert the new node.
