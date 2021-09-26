@@ -324,16 +324,12 @@ int main(void) {
         for (j = 0; ((j + hashSize) < sequence[i].length()); j++) {
             h = hasher(&sequence[i], h, j);
             table.insert(h, i, j);
-        }            
-                
+        }                            
     }
     int lHash, rHash;
     Probe bestProbe;
     Probe currentProbe;
     bestProbe.setErrorRate(9999);
-
-
-// Node *tmp;
 
     for (int i = 0; i < N; i++) {
         // check every position in every delta sequence
@@ -369,21 +365,19 @@ int main(void) {
                 currentProbe.updateInfo();
 
                 if (currentProbe.getErrorRate() < bestProbe.getErrorRate()) bestProbe = currentProbe;
-
             }            
         }
-
     }
-    // print best probe info
-    cout << "Best Probe: " << endl;
-    cout << "   probe:      " << sequence[bestProbe.getSeq()].substr(bestProbe.getPos(), K) << endl;
-    cout << "   left hash:  " << bestProbe.getlHash() << endl;
-    cout << "   left hash:  " << bestProbe.getrHash() << endl;
-    cout << "   false pos:  " << bestProbe.getFalsePositives() << endl;
-    cout << "   false neg:  " << bestProbe.getFalseNegatives() << endl;
-    cout << "   error rate: " << bestProbe.getErrorRate() << endl;
-    cout << "   sequence:   " << bestProbe.getSeq() << endl;
-    cout << "   position:   " << bestProbe.getPos() << endl;
+    // print best probe info.  uncomment lines for additional information
+    cout << "\nBest Probe of length " << K <<" characters:" << endl;
+    cout << "   " << sequence[bestProbe.getSeq()].substr(bestProbe.getPos(), K) << endl;
+    // cout << "   left hash:  " << bestProbe.getlHash() << endl;
+    // cout << "   left hash:  " << bestProbe.getrHash() << endl;
+    cout << "   False Positives:    " << bestProbe.getFalsePositives() << endl;
+    cout << "   False Negatives:    " << bestProbe.getFalseNegatives() << endl;
+    cout << "   Error Rate:         " << bestProbe.getErrorRate() << endl;
+    // cout << "   sequence:   " << bestProbe.getSeq() << endl;
+    // cout << "   position:   " << bestProbe.getPos() << endl;
 
     delete[] sequence;
     delete[] is_delta;
@@ -395,5 +389,4 @@ int main(void) {
     currentProbe.cleanup();
 
     return 0;
-
 }
